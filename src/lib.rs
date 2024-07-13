@@ -5,8 +5,6 @@
 //!
 //! psd spec: https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/
 
-#![deny(missing_docs)]
-
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -32,9 +30,7 @@ use crate::sections::MajorSections;
 
 use self::sections::file_header_section::FileHeaderSection;
 
-mod blend;
 mod psd_channel;
-mod render;
 mod sections;
 
 /// An list of errors returned when processing PSD file.
@@ -190,75 +186,6 @@ impl Psd {
             ),
             None => None,
         }
-    }
-
-    /// Given a filter, combine all layers in the PSD that pass the filter into a vector
-    /// of RGBA pixels.
-    ///
-    /// We'll start from the top most layer and iterate through the pixels.
-    ///
-    /// If the pixel is transparent, recursively blend it with the pixels below it until
-    /// we hit an opaque pixel or we hit the bottom of the stack.
-    ///
-    /// TODO: Take the layer's blend mode into account when blending layers. Right now
-    /// we just use ONE_MINUS_SRC_ALPHA blending regardless of the layer.
-    pub fn flatten_layers_rgba(
-        &self,
-        filter: &dyn Fn((usize, &PsdLayer)) -> bool,
-    ) -> Result<Vec<u8>, PsdError> {
-        // When you create a PSD but don't create any new layers the bottom layer might not
-        // show up in the layer and mask information section, so we won't see any layers.
-        //
-        // TODO: We should try and figure out where the layer name is so that we can return
-        // a completely transparent image if it is filtered out. But this should be a rare
-        // use case so we can just always return the final image for now.
-        if self.layers().is_empty() {
-            return Ok(self.rgba());
-        }
-
-        // Filter out layers based on the passed in filter.
-        let layers_to_flatten_top_down: Vec<&PsdLayer> = self
-            .layers()
-            .iter()
-            .enumerate()
-            // here we filter transparent layers and invisible layers
-            .filter(|(_, layer)| (layer.opacity > 0 && layer.visible) || layer.clipping_mask)
-            .filter(|(idx, layer)| filter((*idx, layer)))
-            .map(|(_, layer)| layer)
-            .collect();
-
-        let pixel_count = self.width() * self.height();
-
-        // If there aren't any layers left after filtering we return a complete transparent image.
-        if layers_to_flatten_top_down.is_empty() {
-            return Ok(vec![0; pixel_count as usize * 4]);
-        }
-
-        // During the process of flattening the PSD we might need to look at the pixels on one of
-        // the layers below if an upper layer is transparent.
-        //
-        // Anytime we need to calculate the RGBA for a layer we cache it so that we don't need
-        // to perform that operation again.
-        let renderer = render::Renderer::new(&layers_to_flatten_top_down, self.width() as usize);
-
-        let mut flattened_pixels = Vec::with_capacity((pixel_count * 4) as usize);
-
-        // Iterate over each pixel and, if it is transparent, blend it with the pixel below it
-        // recursively.
-        for pixel_idx in 0..pixel_count as usize {
-            let left = pixel_idx % self.width() as usize;
-            let top = pixel_idx / self.width() as usize;
-            let pixel_coord = (left, top);
-
-            let blended_pixel = renderer.flattened_pixel(pixel_coord);
-
-            flattened_pixels.push(blended_pixel[0]);
-            flattened_pixels.push(blended_pixel[1]);
-            flattened_pixels.push(blended_pixel[2]);
-            flattened_pixels.push(blended_pixel[3]);
-        }
-
-        Ok(flattened_pixels)
     }
 }
 

@@ -72,20 +72,6 @@ fn transparency_rle_compressed() -> Result<()> {
     Ok(())
 }
 
-// Fixes an `already borrowed: BorrowMutError` that we were getting in the `flattened_pixel`
-// method when we were recursing into the method and trying to borrow when we'd already borrowed.
-#[test]
-fn transparent_above_opaque() -> Result<()> {
-    let psd = include_bytes!("./fixtures/transparent-above-opaque.psd");
-    let psd = Psd::from_bytes(psd)?;
-
-    let image = psd.flatten_layers_rgba(&|_| true)?;
-
-    assert_eq!(image[0..4], BLUE_PIXEL);
-
-    Ok(())
-}
-
 // Ensure that the specified, zero-indexed left, top coordinate has the provided pixel color.
 // Otherwise it should be fully transparent.
 // (left, top, pixel)
@@ -113,26 +99,4 @@ fn assert_colors(image: Vec<u8>, psd: &Psd, assertions: &[(usize, usize, [u8; 4]
             }
         };
     }
-}
-
-fn make_image(pixel: [u8; 4], pixel_count: u32) -> Vec<u8> {
-    let pixel_count = pixel_count as usize;
-    let mut image = vec![0; pixel_count * 4];
-
-    for idx in 0..pixel_count {
-        image[idx * 4] = pixel[0];
-        image[idx * 4 + 1] = pixel[1];
-        image[idx * 4 + 2] = pixel[2];
-        image[idx * 4 + 3] = pixel[3];
-    }
-
-    image
-}
-
-fn put_pixel(image: &mut Vec<u8>, width: usize, left: usize, top: usize, new: [u8; 4]) {
-    let idx = (top * width) + left;
-    image[idx * 4] = new[0];
-    image[idx * 4 + 1] = new[1];
-    image[idx * 4 + 2] = new[2];
-    image[idx * 4 + 3] = new[3];
 }

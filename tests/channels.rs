@@ -15,10 +15,6 @@ fn one_channel_grayscale_raw_data() -> Result<()> {
     let final_image = psd.rgba();
     assert_eq!(final_image, [175, 175, 175, 255]);
 
-    // There is one layer which should have the same RGBA as the final image
-    let layer_rgba = psd.flatten_layers_rgba(&|_| true)?;
-    assert_eq!(layer_rgba, [175, 175, 175, 255]);
-
     Ok(())
 }
 

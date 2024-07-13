@@ -15,7 +15,6 @@ mod image_resource;
 
 struct ImageResourcesBlock {
     resource_id: i16,
-    name: String,
     data_range: Range<usize>,
 }
 
@@ -85,7 +84,7 @@ impl ImageResourcesSection {
         }
 
         let resource_id = cursor.read_i16();
-        let name = cursor.read_pascal_string();
+        let _name = cursor.read_pascal_string();
 
         let data_len = cursor.read_u32();
         let pos = cursor.position() as usize;
@@ -99,7 +98,6 @@ impl ImageResourcesSection {
 
         Ok(ImageResourcesBlock {
             resource_id,
-            name,
             data_range,
         })
     }
@@ -133,9 +131,8 @@ impl ImageResourcesSection {
             let mut descriptors = Vec::new();
 
             for _ in 0..number_of_slices {
-                match ImageResourcesSection::read_slice_body(&mut cursor)? {
-                    Some(v) => descriptors.push(v),
-                    None => {}
+                if let Some(v) = ImageResourcesSection::read_slice_body(&mut cursor)? {
+                    descriptors.push(v)
                 }
             }
 
@@ -288,17 +285,13 @@ pub enum DescriptorField {
     UnitFloat(UnitFloatStructure),
     /// Double-precision floating-point number
     Double(f64),
-    ///
     Class(ClassStructure),
     /// Text
     String(String),
-    ///
     EnumeratedReference(EnumeratedReference),
-    ///
     Offset(OffsetStructure),
     /// Boolean value
     Boolean(bool),
-    ///
     Alias(AliasStructure),
     /// A list of fields
     List(Vec<DescriptorField>),
@@ -306,7 +299,6 @@ pub enum DescriptorField {
     LargeInteger(i64),
     /// 32bit integer number
     Integer(i32),
-    ///
     EnumeratedDescriptor(EnumeratedDescriptor),
     /// Raw bytes data
     RawData(Vec<u8>),
@@ -315,11 +307,8 @@ pub enum DescriptorField {
     ///
     ///
     Property(PropertyStructure),
-    ///
     Identifier(i32),
-    ///
     Index(i32),
-    ///
     Name(NameStructure),
 }
 
@@ -523,7 +512,7 @@ impl DescriptorStructure {
     ) -> Result<DescriptorStructure, ImageResourcesDescriptorError> {
         let name = cursor.read_unicode_string_padding(1);
         let class_id = DescriptorStructure::read_key_length(cursor).to_vec();
-        let fields = DescriptorStructure::read_fields(cursor, false)?;
+        let fields = DescriptorStructure::read_fields(cursor)?;
 
         Ok(DescriptorStructure {
             name,
@@ -534,12 +523,11 @@ impl DescriptorStructure {
 
     fn read_fields(
         cursor: &mut PsdCursor,
-        sub_list: bool,
     ) -> Result<HashMap<String, DescriptorField>, ImageResourcesDescriptorError> {
         let count = cursor.read_u32();
         let mut m = HashMap::with_capacity(count as usize);
 
-        for n in 0..count {
+        for _ in 0..count {
             let key = DescriptorStructure::read_key_length(cursor);
             let key = String::from_utf8_lossy(key).into_owned();
 
@@ -551,12 +539,11 @@ impl DescriptorStructure {
 
     fn read_list(
         cursor: &mut PsdCursor,
-        sub_list: bool,
     ) -> Result<Vec<DescriptorField>, ImageResourcesDescriptorError> {
         let count = cursor.read_u32();
         let mut vec = Vec::with_capacity(count as usize);
 
-        for n in 0..count {
+        for _ in 0..count {
             let field = DescriptorStructure::read_descriptor_field(cursor)?;
             vec.push(field);
         }
@@ -633,7 +620,7 @@ impl DescriptorStructure {
         let count = cursor.read_u32();
         let mut vec = Vec::with_capacity(count as usize);
 
-        for n in 0..count {
+        for _ in 0..count {
             DescriptorStructure::read_key_length(cursor);
 
             let mut os_type = [0; 4];
@@ -733,7 +720,7 @@ impl DescriptorStructure {
     fn read_list_structure(
         cursor: &mut PsdCursor,
     ) -> Result<Vec<DescriptorField>, ImageResourcesDescriptorError> {
-        DescriptorStructure::read_list(cursor, true)
+        DescriptorStructure::read_list(cursor)
     }
 
     fn read_enumerated_descriptor(cursor: &mut PsdCursor) -> EnumeratedDescriptor {

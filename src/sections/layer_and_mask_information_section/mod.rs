@@ -111,7 +111,7 @@ impl LayerAndMaskInformationSection {
         // TODO: If the layer count was negative we were supposed to treat the first alpha
         // channel as transparency data for the merged result.. So add a new test with a transparent
         // PSD and make sure that we're handling this case properly.
-        let layer_count: u16 = layer_count.abs() as u16;
+        let layer_count: u16 = layer_count.unsigned_abs();
         let (group_count, layer_records) =
             LayerAndMaskInformationSection::read_layer_records(&mut cursor, layer_count)?;
 
@@ -149,7 +149,7 @@ impl LayerAndMaskInformationSection {
             match layer_record.divider_type {
                 // open the folder
                 Some(GroupDivider::CloseFolder) | Some(GroupDivider::OpenFolder) => {
-                    already_viewed = already_viewed + 1;
+                    already_viewed += 1;
 
                     let frame = Frame {
                         start_idx: layers.len(),
@@ -212,11 +212,8 @@ impl LayerAndMaskInformationSection {
         for _layer_num in 0..layer_count {
             let layer_record = read_layer_record(cursor)?;
 
-            match layer_record.divider_type {
-                Some(GroupDivider::BoundingSection) => {
-                    groups_count = groups_count + 1;
-                }
-                _ => {}
+            if let Some(GroupDivider::BoundingSection) = layer_record.divider_type {
+                groups_count += 1;
             }
 
             layer_records.push(layer_record);
@@ -245,7 +242,7 @@ impl LayerAndMaskInformationSection {
         channels: LayerChannels,
     ) -> Result<PsdLayer, PsdLayerError> {
         Ok(PsdLayer::new(
-            &layer_record,
+            layer_record,
             psd_size.0,
             psd_size.1,
             if parent_id > 0 { Some(parent_id) } else { None },
@@ -257,7 +254,7 @@ impl LayerAndMaskInformationSection {
 /// Reads layer channels
 fn read_layer_channels(
     cursor: &mut PsdCursor,
-    channel_data_lengths: &Vec<(PsdChannelKind, u32)>,
+    channel_data_lengths: &[(PsdChannelKind, u32)],
     scanlines: usize,
 ) -> Result<LayerChannels, PsdLayerError> {
     let capacity = channel_data_lengths.len();
