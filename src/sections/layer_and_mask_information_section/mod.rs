@@ -1,15 +1,17 @@
+pub mod groups;
+pub mod layer;
+pub mod layers;
+
 use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::psd_channel::PsdChannelCompression;
 use crate::psd_channel::PsdChannelKind;
 use crate::sections::image_data_section::ChannelBytes;
-use crate::sections::layer_and_mask_information_section::groups::Groups;
-use crate::sections::layer_and_mask_information_section::layer::{
-    BlendMode, GroupDivider, LayerChannels, LayerRecord, PsdGroup, PsdLayer, PsdLayerError,
-};
-use crate::sections::layer_and_mask_information_section::layers::Layers;
 use crate::sections::PsdCursor;
+use groups::*;
+pub use layer::*;
+use layers::*;
 
 /// One of the possible additional layer block signatures
 const SIGNATURE_EIGHT_BIM: [u8; 4] = [56, 66, 73, 77];
@@ -21,10 +23,6 @@ const SIGNATURE_EIGHT_B64: [u8; 4] = [56, 66, 54, 52];
 const KEY_UNICODE_LAYER_NAME: &[u8; 4] = b"luni";
 /// Key of `Section divider setting (Photoshop 6.0)`, "lsct"
 const KEY_SECTION_DIVIDER_SETTING: &[u8; 4] = b"lsct";
-
-pub mod groups;
-pub mod layer;
-pub mod layers;
 
 /// The LayerAndMaskInformationSection comes from the bytes in the fourth section of the PSD.
 ///

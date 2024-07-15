@@ -1,14 +1,15 @@
-use std::io::Cursor;
-
-use self::file_header_section::{FileHeaderSectionError, EXPECTED_PSD_SIGNATURE};
-
-/// The length of the entire file header section
-const FILE_HEADER_SECTION_LEN: usize = 26;
-
 pub mod file_header_section;
 pub mod image_data_section;
 pub mod image_resources_section;
 pub mod layer_and_mask_information_section;
+
+pub use layer_and_mask_information_section::*;
+
+use self::file_header_section::{FileHeaderSectionError, EXPECTED_PSD_SIGNATURE};
+use std::io::Cursor;
+
+/// The length of the entire file header section
+const FILE_HEADER_SECTION_LEN: usize = 26;
 
 /// References to the different major sections of a PSD file
 #[derive(Debug)]

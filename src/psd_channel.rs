@@ -170,7 +170,7 @@ pub trait IntoRgba {
 
 /// Indicates how a channe'sl data is compressed
 #[derive(Debug, Eq, PartialEq)]
-#[allow(missing_docs)]
+
 pub enum PsdChannelCompression {
     /// Not compressed
     RawData = 0,
@@ -197,7 +197,7 @@ impl PsdChannelCompression {
 
 /// The different kinds of channels in a layer (red, green, blue, ...).
 #[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
-#[allow(missing_docs)]
+
 pub enum PsdChannelKind {
     Red = 0,
     Green = 1,

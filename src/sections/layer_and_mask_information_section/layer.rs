@@ -72,15 +72,15 @@ impl LayerProperties {
     }
 
     /// The width of the layer
-    pub fn width(&self) -> u16 {
+    pub fn width(&self) -> i32 {
         // If left is at 0 and right is at 4, the width is 5
-        (self.layer_right - self.layer_left) as u16 + 1
+        self.layer_right - self.layer_left + 1
     }
 
     /// The height of the layer
-    pub fn height(&self) -> u16 {
+    pub fn height(&self) -> i32 {
         // If top is at 0 and bottom is at 3, the height is 4
-        (self.layer_bottom - self.layer_top) as u16 + 1
+        self.layer_bottom - self.layer_top + 1
     }
 
     /// If true, the layer is marked as visible

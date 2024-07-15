@@ -1,6 +1,10 @@
 use crate::psd_channel::PsdChannelCompression;
 use crate::sections::PsdCursor;
 use crate::PsdDepth;
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Formatter},
+};
 use thiserror::Error;
 
 /// Represents an malformed image data
@@ -219,8 +223,59 @@ impl ImageDataSection {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ChannelBytes {
     RawData(Vec<u8>),
     RleCompressed(Vec<u8>),
+}
+
+impl Debug for ChannelBytes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelBytes::RawData(bytes) => write!(f, "RawData({} bytes)", bytes.len()),
+            ChannelBytes::RleCompressed(bytes) => write!(f, "RleCompressed({} bytes)", bytes.len()),
+        }
+    }
+}
+
+impl ChannelBytes {
+    pub fn to_raw_data(&self) -> Cow<'_, [u8]> {
+        match self {
+            ChannelBytes::RawData(bytes) => bytes.into(),
+            ChannelBytes::RleCompressed(bytes) => {
+                let mut out = Vec::with_capacity(bytes.len());
+                let mut cursor = PsdCursor::new(bytes);
+
+                let len = cursor.get_ref().len() as u64;
+
+                while cursor.position() < len {
+                    let header = cursor.read_i8() as i16;
+
+                    if header == -128 {
+                        continue;
+                    } else if header >= 0 {
+                        let bytes_to_read = 1 + header;
+                        if cursor.position() + bytes_to_read as u64 > len {
+                            break;
+                        }
+                        for byte in cursor.read(bytes_to_read as u32) {
+                            out.push(*byte);
+                        }
+                    } else {
+                        let repeat = 1 - header;
+
+                        if cursor.position() + 1 > len {
+                            break;
+                        }
+                        let byte = cursor.read_1()[0];
+                        for _ in 0..repeat {
+                            out.push(byte);
+                        }
+                    };
+                }
+
+                out.into()
+            }
+        }
+    }
 }
