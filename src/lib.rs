@@ -11,7 +11,7 @@ use std::ops::Deref;
 use thiserror::Error;
 
 use self::sections::file_header_section::FileHeaderSection;
-pub use crate::psd_channel::IntoRgba;
+pub use crate::psd_channel::{IntoRgba, ToMask};
 pub use crate::psd_channel::{PsdChannelCompression, PsdChannelKind};
 pub use crate::sections::file_header_section::{ColorMode, PsdDepth};
 use crate::sections::image_data_section::ChannelBytes;

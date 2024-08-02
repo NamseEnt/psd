@@ -1,5 +1,6 @@
 pub mod groups;
 pub mod layer;
+mod layer_mask_data;
 pub mod layers;
 
 use std::collections::HashMap;
@@ -11,6 +12,8 @@ use crate::sections::image_data_section::ChannelBytes;
 use crate::sections::PsdCursor;
 use groups::*;
 pub use layer::*;
+use layer_mask_data::read_layer_mask_data;
+pub use layer_mask_data::{LayerMaskData, LayerMaskDataInner};
 use layers::*;
 
 /// One of the possible additional layer block signatures
@@ -64,6 +67,7 @@ struct Frame {
     group_id: u32,
     parent_group_id: u32,
     group_layer_record: LayerRecord,
+    channels: LayerChannels,
 }
 
 impl LayerAndMaskInformationSection {
@@ -145,7 +149,12 @@ impl LayerAndMaskInformationSection {
                 clipping_base: false,
                 blend_mode: BlendMode::Normal,
                 divider_type: None,
+                layer_mask_data: LayerMaskData {
+                    raster_mask: None,
+                    vector_mask: None,
+                },
             },
+            channels: HashMap::new(),
         }];
 
         // Viewed group counter
@@ -166,6 +175,7 @@ impl LayerAndMaskInformationSection {
                         group_id: already_viewed,
                         parent_group_id: current_group_id,
                         group_layer_record: layer_record,
+                        channels,
                     };
 
                     stack.push(frame);
@@ -192,6 +202,7 @@ impl LayerAndMaskInformationSection {
                         } else {
                             None
                         },
+                        frame.channels,
                     ));
                 }
 
@@ -231,11 +242,7 @@ impl LayerAndMaskInformationSection {
 
         let mut result = vec![];
         for layer_record in layer_records {
-            let channels = read_layer_channels(
-                cursor,
-                &layer_record.channel_data_lengths,
-                layer_record.height() as usize,
-            )?;
+            let channels = read_layer_channels(cursor, &layer_record)?;
 
             result.push((layer_record, channels));
         }
@@ -264,9 +271,9 @@ impl LayerAndMaskInformationSection {
 /// Reads layer channels
 fn read_layer_channels(
     cursor: &mut PsdCursor,
-    channel_data_lengths: &[(PsdChannelKind, u32)],
-    scanlines: usize,
+    layer_record: &LayerRecord,
 ) -> Result<LayerChannels, PsdLayerError> {
+    let channel_data_lengths = &layer_record.channel_data_lengths;
     let capacity = channel_data_lengths.len();
     let mut channels = HashMap::with_capacity(capacity);
 
@@ -291,6 +298,23 @@ fn read_layer_channels(
                 // moment.
                 // Compressed bytes per scanline are encoded at the beginning as 2 bytes
                 // per scanline
+                let scanlines = match channel_kind {
+                    PsdChannelKind::Red
+                    | PsdChannelKind::Green
+                    | PsdChannelKind::Blue
+                    | PsdChannelKind::TransparencyMask => layer_record.height(),
+                    PsdChannelKind::UserSuppliedLayerMask => layer_record
+                        .layer_mask_data
+                        .vector_mask
+                        .as_ref()
+                        .map_or(0, |mask| mask.height()),
+                    PsdChannelKind::RealUserSuppliedLayerMask => layer_record
+                        .layer_mask_data
+                        .raster_mask
+                        .as_ref()
+                        .map_or(0, |mask| mask.height()),
+                } as usize;
+
                 let channel_data = &channel_data[2 * scanlines..];
                 ChannelBytes::RleCompressed(channel_data.into())
             }
@@ -401,9 +425,7 @@ fn read_layer_record(cursor: &mut PsdCursor) -> Result<LayerRecord, PsdLayerErro
     // We do not currently use the length of the extra data field, skip it
     cursor.read_4();
 
-    // We do not currently use the layer mask data, skip it
-    let layer_mask_data_len = cursor.read_u32();
-    cursor.read(layer_mask_data_len);
+    let layer_mask_data = read_layer_mask_data(cursor)?;
 
     // We do not currently use the layer blending range, skip it
     let layer_blending_range_data_len = cursor.read_u32();
@@ -473,5 +495,6 @@ fn read_layer_record(cursor: &mut PsdCursor) -> Result<LayerRecord, PsdLayerErro
         clipping_base,
         blend_mode,
         divider_type,
+        layer_mask_data,
     })
 }

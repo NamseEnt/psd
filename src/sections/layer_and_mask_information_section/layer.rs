@@ -3,10 +3,11 @@ use std::ops::{Deref, Range};
 
 use thiserror::Error;
 
-use crate::psd_channel::IntoRgba;
+use super::layer_mask_data::LayerMaskData;
 use crate::psd_channel::PsdChannelCompression;
 use crate::psd_channel::PsdChannelError;
 use crate::psd_channel::PsdChannelKind;
+use crate::psd_channel::{IntoRgba, ToMask};
 use crate::sections::image_data_section::ChannelBytes;
 
 /// Information about a layer in a PSD file.
@@ -40,6 +41,8 @@ pub struct LayerProperties {
     pub(crate) blend_mode: BlendMode,
     /// If layer is nested, contains parent group ID, otherwise `None`
     pub(crate) group_id: Option<u32>,
+    /// Mask data
+    pub(crate) layer_mask_data: LayerMaskData,
 }
 
 impl LayerProperties {
@@ -63,6 +66,7 @@ impl LayerProperties {
             psd_width,
             psd_height,
             group_id,
+            layer_mask_data: layer_record.layer_mask_data.clone(),
         }
     }
 
@@ -138,6 +142,9 @@ pub struct PsdGroup {
     pub(crate) contained_layers: Range<usize>,
     /// Common layer properties
     pub(crate) layer_properties: LayerProperties,
+    /// The channels of the group, stored separately.
+    /// Maybe UserSuppliedLayerMask.
+    pub(crate) channels: LayerChannels,
 }
 
 impl PsdGroup {
@@ -150,6 +157,7 @@ impl PsdGroup {
         psd_width: u32,
         psd_height: u32,
         group_id: Option<u32>,
+        channels: LayerChannels,
     ) -> Self {
         let layer_properties =
             LayerProperties::from_layer_record(name, layer_record, psd_width, psd_height, group_id);
@@ -158,6 +166,7 @@ impl PsdGroup {
             id,
             contained_layers,
             layer_properties,
+            channels,
         }
     }
 
@@ -172,6 +181,47 @@ impl Deref for PsdGroup {
 
     fn deref(&self) -> &Self::Target {
         &self.layer_properties
+    }
+}
+
+impl ToMask for PsdGroup {
+    fn raster_mask(&self) -> Option<(&ChannelBytes, i32, i32, i32, i32)> {
+        self.layer_mask_data
+            .raster_mask
+            .as_ref()
+            .and_then(|raster_mask| {
+                let bytes = self
+                    .channels
+                    .get(&PsdChannelKind::RealUserSuppliedLayerMask)
+                    .or(self.channels.get(&PsdChannelKind::UserSuppliedLayerMask));
+                bytes.map(|bytes| {
+                    (
+                        bytes,
+                        raster_mask.top,
+                        raster_mask.right,
+                        raster_mask.bottom,
+                        raster_mask.left,
+                    )
+                })
+            })
+    }
+
+    fn vector_mask(&self) -> Option<(&ChannelBytes, i32, i32, i32, i32)> {
+        self.layer_mask_data
+            .vector_mask
+            .as_ref()
+            .and_then(|vector_mask| {
+                let bytes = self.channels.get(&PsdChannelKind::UserSuppliedLayerMask);
+                bytes.map(|bytes| {
+                    (
+                        bytes,
+                        vector_mask.top,
+                        vector_mask.right,
+                        vector_mask.bottom,
+                        vector_mask.left,
+                    )
+                })
+            })
     }
 }
 
@@ -207,6 +257,8 @@ pub enum PsdLayerError {
     UnknownBlendingMode { mode: [u8; 4] },
     #[error("{compression} is an invalid layer channel compression. Must be 0, 1, 2 or 3")]
     InvalidCompression { compression: u16 },
+    #[error("{length} is an invalid layer mask length")]
+    InvalidLayerMaskLength { length: u32 },
 }
 
 impl PsdLayer {
@@ -394,6 +446,8 @@ pub struct LayerRecord {
     pub(super) blend_mode: BlendMode,
     /// Group divider tag
     pub(super) divider_type: Option<GroupDivider>,
+    /// Layer mask data
+    pub(super) layer_mask_data: LayerMaskData,
 }
 
 impl LayerRecord {
@@ -470,5 +524,47 @@ impl IntoRgba for PsdLayer {
 
     fn psd_height(&self) -> u32 {
         self.layer_properties.psd_height
+    }
+}
+
+impl ToMask for PsdLayer {
+    fn raster_mask(&self) -> Option<(&ChannelBytes, i32, i32, i32, i32)> {
+        self.layer_mask_data
+            .raster_mask
+            .as_ref()
+            .and_then(|raster_mask| {
+                let bytes = self
+                    .channels
+                    .get(&PsdChannelKind::RealUserSuppliedLayerMask)
+                    .or(self.channels.get(&PsdChannelKind::UserSuppliedLayerMask));
+                bytes.map(|bytes| {
+                    (
+                        bytes,
+                        raster_mask.top,
+                        raster_mask.right,
+                        raster_mask.bottom,
+                        raster_mask.left,
+                    )
+                })
+            })
+    }
+
+    fn vector_mask(&self) -> Option<(&ChannelBytes, i32, i32, i32, i32)> {
+        self.layer_mask_data
+            .vector_mask
+            .as_ref()
+            .and_then(|vector_mask| {
+                let bytes: Option<&ChannelBytes> =
+                    self.channels.get(&PsdChannelKind::UserSuppliedLayerMask);
+                bytes.map(|bytes| {
+                    (
+                        bytes,
+                        vector_mask.top,
+                        vector_mask.right,
+                        vector_mask.bottom,
+                        vector_mask.left,
+                    )
+                })
+            })
     }
 }

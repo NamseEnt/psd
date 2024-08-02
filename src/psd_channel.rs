@@ -243,12 +243,20 @@ impl PsdChannelKind {
     }
 }
 
+pub trait ToMask {
+    /// bytes and top, right, bottom, left
+    fn raster_mask(&self) -> Option<(&ChannelBytes, i32, i32, i32, i32)>;
+
+    /// bytes and top, right, bottom, left
+    fn vector_mask(&self) -> Option<(&ChannelBytes, i32, i32, i32, i32)>;
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sections::layer_and_mask_information_section::layer::{
         BlendMode, LayerChannels, LayerProperties,
     };
-    use crate::PsdLayer;
+    use crate::{LayerMaskData, PsdLayer};
 
     use super::*;
 
@@ -269,6 +277,10 @@ mod tests {
             psd_height: 1,
             blend_mode: BlendMode::Normal,
             group_id: None,
+            layer_mask_data: LayerMaskData {
+                vector_mask: None,
+                raster_mask: None,
+            },
         };
 
         let layer = PsdLayer {
