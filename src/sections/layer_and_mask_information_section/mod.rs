@@ -307,6 +307,7 @@ fn read_layer_channels(
                         .layer_mask_data
                         .vector_mask
                         .as_ref()
+                        .or(layer_record.layer_mask_data.raster_mask.as_ref())
                         .map_or(0, |mask| mask.height()),
                     PsdChannelKind::RealUserSuppliedLayerMask => layer_record
                         .layer_mask_data
