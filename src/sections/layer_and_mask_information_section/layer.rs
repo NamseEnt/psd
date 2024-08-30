@@ -343,8 +343,9 @@ impl GroupDivider {
 }
 
 /// Describes how to blend a layer with the layer below it
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
+#[repr(u8)]
 pub enum BlendMode {
     PassThrough = 0,
     Normal = 1,
